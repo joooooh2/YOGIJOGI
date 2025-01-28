@@ -1,0 +1,329 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="my.yogijogi.com.mapper.BoardMapper">
+	<resultMap type="restaurantVO" id="restaurantMap">
+		<result property="rstrntCd" column="RSTRNT_CD"/>
+		<result property="rstrntNm" column="RSTRNT_NM"/>
+		<result property="rstrntAddr" column="RSTRNT_ADDR"/>
+		<result property="rstrntTel" column="RSTRNT_TEL"/>
+		<result property="rstrntSort" column="RSTRNT_SORT"/>
+		<result property="rstrntMenu" column="RSTRNT_MENU"/>
+		<result property="rstrntDscrp" column="RSTRNT_DSCRP"/>
+		<result property="rstrntBsnTm" column="RSTRNT_BSN_TM"/>
+		<result property="rstrntPrkplce" column="RSTRNT_PRKPLCE"/>
+		<result property="rstrntResve" column="RSTRNT_RESVE"/>
+		<result property="rstrntOperStt" column="RSTRNT_OPER_STT"/>
+		<result property="atchFileCd" column="ATCH_FILE_CD"/>
+		<collection property="reviewVOList" resultMap="reviewMap"></collection>
+		<collection property="atchFileVOList" resultMap="atchFileMap"></collection>
+	</resultMap>
+	
+	<resultMap type="reviewVO" id="reviewMap">
+		<result property="reviewCd" column="REVIEW_CD"/>
+		<result property="reviewCn" column="REVIEW_CN"/>
+		<result property="rating" column="RATING"/>
+		<result property="mberId" column="MBER_ID"/>
+		<result property="rstrntCd" column="RSTRNT_CD"/>
+		<result property="visitDate" column="VISIT_DATE"/>
+		<result property="reviewDate" column="REVIEW_DATE"/>
+		<result property="atchFileCd" column="ATCH_FILE_CD"/>
+		<collection property="atchFileVOList" resultMap="atchFileMap"></collection>
+	</resultMap>
+
+	<resultMap type="atchFileVO" id="atchFileMap">
+		<result property="atchFileCd" column="ATCH_FILE_CD"/>
+		<result property="atchFileSn" column="ATCH_FILE_SN"/>
+		<result property="atchFileNm" column="ATCH_FILE_NM"/>
+		<result property="atchFileTy" column="ATCH_FILE_TY"/>
+		<result property="atchFileCours" column="ATCH_FILE_COURS"/>
+		<result property="mberId" column="MBER_ID"/>
+	</resultMap>
+	
+	<!-- 맛집 리스트 -->
+	<select id="rstrntList" parameterType="map" resultMap="restaurantMap">
+		WITH T AS(
+		    SELECT 
+		        ROW_NUMBER() OVER (ORDER BY COALESCE(ROUND(AVG(RV.RATING), 1), 0) DESC, RS.RSTRNT_CD DESC) RNUM,
+		        RS.RSTRNT_CD,
+		        RS.RSTRNT_NM,
+		        RS.RSTRNT_ADDR,
+		        RS.RSTRNT_SORT,
+		        RS.ATCH_FILE_CD AS RSTRNT_ATCH_FILE_CD,
+		        ROUND(AVG(RV.RATING), 1) AS RATING,
+		        A.ATCH_FILE_CD AS FILE_ATCH_FILE_CD,
+		        A.ATCH_FILE_NM,
+		        A.ATCH_FILE_COURS
+		    FROM 
+		        RESTAURANT RS
+		    LEFT OUTER JOIN 
+		        REVIEW RV
+		    ON 
+		        RS.RSTRNT_CD = RV.RSTRNT_CD
+		    INNER JOIN
+		        ATCH_FILE A
+		    ON
+		        RS.ATCH_FILE_CD = A.ATCH_FILE_CD
+		    WHERE 1=1
+		        AND RS.RSTRNT_SORT = #{rstrntSort}
+		    	AND RS.RSTRNT_OPER_STT = 1     
+		    GROUP BY 
+		        RS.RSTRNT_CD,
+		        RS.RSTRNT_NM,
+		        RS.RSTRNT_ADDR,
+		        RS.RSTRNT_SORT,
+		        RS.ATCH_FILE_CD,
+		        A.ATCH_FILE_CD,
+		        A.ATCH_FILE_NM,
+		        A.ATCH_FILE_COURS
+		)
+		SELECT T.*
+		FROM T
+		WHERE T.RNUM BETWEEN (#{currentPage}*6) - (6 - 1) AND (#{currentPage}*6)
+	</select>
+	
+	<!-- 맛집 리스트 수 -->
+	<select id="getRstrntCount" parameterType="String" resultType="int">
+		SELECT 	COUNT(*)
+		FROM 	RESTAURANT
+		WHERE 	RSTRNT_SORT = #{rstrntSort}
+	</select>
+	
+	<!-- 맛집 상세 보기 -->
+	<select id="rstrntDetail" parameterType="String" resultMap="restaurantMap">
+		SELECT
+			RS.RSTRNT_CD, 
+			RS.RSTRNT_NM, 
+			RS.RSTRNT_ADDR, 
+			RS.RSTRNT_TEL, 
+			RS.RSTRNT_SORT,
+			RS.RSTRNT_MENU,
+			RS.RSTRNT_DSCRP,
+			RS.RSTRNT_BSN_TM,
+			RS.RSTRNT_PRKPLCE,
+			RS.RSTRNT_RESVE,
+			RS.ATCH_FILE_CD,
+			A.ATCH_FILE_CD,
+			A.ATCH_FILE_NM,
+			A.ATCH_FILE_COURS
+		FROM 
+			RESTAURANT RS
+		INNER JOIN
+			ATCH_FILE A ON RS.ATCH_FILE_CD = A.ATCH_FILE_CD
+		WHERE 
+			RS.RSTRNT_CD = #{rstrntCd}
+	</select>
+	
+	<!-- 추천 맛집 가져오기 -->
+	<select id="getRelatedRstrnt" parameterType="String" resultMap="restaurantMap">
+		SELECT  	R.RSTRNT_CD, R.RSTRNT_NM, R.RSTRNT_ADDR, R.RSTRNT_SORT,
+            		A.ATCH_FILE_NM, A.ATCH_FILE_COURS
+		FROM    	RESTAURANT R
+		INNER JOIN 	ATCH_FILE A
+		ON  		R.ATCH_FILE_CD = A.ATCH_FILE_CD
+		WHERE  		1=1
+		AND			R.RSTRNT_SORT = #{rstrntSort}
+		AND			R.RSTRNT_OPER_STT = 1
+	</select>
+	
+	<!-- 리뷰 가져오기 -->
+	<select id="getReview" parameterType="String" resultMap="reviewMap">
+		SELECT
+			R.REVIEW_CD,
+			R.REVIEW_CN,
+			R.RATING,
+			R.MBER_ID,
+			R.RSTRNT_CD,
+			R.VISIT_DATE,
+			R.REVIEW_DATE,
+			R.ATCH_FILE_CD,
+            A.ATCH_FILE_CD,
+            A.ATCH_FILE_NM,
+            A.ATCH_FILE_COURS
+		FROM
+			REVIEW R
+		LEFT OUTER JOIN
+			ATCH_FILE A ON R.ATCH_FILE_CD = A.ATCH_FILE_CD
+		WHERE
+			R.RSTRNT_CD = #{rstrntCd}
+	</select>
+	
+	<!-- 음식점 등록 -->
+	<insert id="insertRstrnt" parameterType="restaurantVO">
+		<selectKey resultType="String" order="BEFORE" keyProperty="rstrntCd">
+			SELECT 	LPAD(NVL(MAX(RSTRNT_CD) + 1, '001'), 3, '0')
+			FROM 	RESTAURANT
+		</selectKey>
+		INSERT INTO RESTAURANT(
+			RSTRNT_CD,
+			RSTRNT_NM,
+			RSTRNT_ADDR,
+			RSTRNT_TEL,
+			RSTRNT_MENU,
+			RSTRNT_SORT,
+			RSTRNT_DSCRP,
+			RSTRNT_BSN_TM,
+			RSTRNT_PRKPLCE,
+			RSTRNT_RESVE,
+			ATCH_FILE_CD)
+		VALUES(
+			#{rstrntCd},
+			#{rstrntNm},
+			#{rstrntAddr},
+			#{rstrntTel},
+			#{rstrntMenu},
+			#{rstrntSort},
+			#{rstrntDscrp},
+			#{rstrntBsnTm},
+			#{rstrntPrkplce},
+			#{rstrntResve},
+			#{atchFileCd})
+	</insert>
+	
+	<!-- 음식점 수정 -->
+	<update id="updateRstrnt" parameterType="restaurantVO">
+		UPDATE 	RESTAURANT
+		SET		RSTRNT_NM = #{rstrntNm},
+				RSTRNT_ADDR = #{rstrntAddr},
+				RSTRNT_TEL = #{rstrntTel},
+				RSTRNT_MENU = #{rstrntMenu},
+				RSTRNT_SORT = #{rstrntSort},
+				RSTRNT_DSCRP = #{rstrntDscrp},
+				RSTRNT_BSN_TM = #{rstrntBsnTm},
+				RSTRNT_PRKPLCE = #{rstrntPrkplce},
+				RSTRNT_RESVE = #{rstrntResve}
+		<if test="atchFileCd != null">
+			, ATCH_FILE_CD = #{atchFileCd}
+		</if>
+		WHERE	RSTRNT_CD = #{rstrntCd}
+	</update>
+	
+	<!-- 음식점 삭제(화면에 미출력) -->
+	<update id="deleteRstrnt" parameterType="String">
+		UPDATE 	RESTAURANT
+		SET		RSTRNT_OPER_STT = 0
+		WHERE	RSTRNT_CD = #{rstrntCd}
+	</update>
+	
+	<!-- 첨부파일코드 생성 -->
+	<select id="getAtchFileCd" resultType="String">
+		SELECT 	LPAD(NVL(MAX(ATCH_FILE_CD) + 1, '001'), 3, '0')
+		FROM 	ATCH_FILE
+	</select>
+	
+	<!-- 첨부파일 등록 -->
+	<update id="insertAtchFile" parameterType="java.util.List">
+		<foreach collection="list" item="atchFileVO" open="INSERT ALL" close="SELECT * FROM DUAL" separator=" " index="idx">
+			INTO ATCH_FILE(
+				ATCH_FILE_CD,
+				ATCH_FILE_SN,
+				ATCH_FILE_NM,
+				ATCH_FILE_TY,
+				ATCH_FILE_COURS, 
+			  	MBER_ID)
+			VALUES(
+				#{atchFileVO.atchFileCd},
+			 	#{atchFileVO.atchFileSn},
+			 	#{atchFileVO.atchFileNm},
+			 	#{atchFileVO.atchFileTy},
+			 	#{atchFileVO.atchFileCours},
+				#{atchFileVO.mberId})
+		</foreach>
+	</update>
+	
+	<!-- 첨부파일 수정 -->
+	<update id="updateAtchFile" parameterType="atchFileVO">
+		UPDATE 	ATCH_FILE
+		SET		ATCH_FILE_NM = #{atchFileNm},
+				ATCH_FILE_TY = #{atchFileTy},
+				ATCH_FILE_COURS = #{atchFileCours}
+		WHERE	ATCH_FILE_CD = #{atchFileCd}
+	</update>
+	
+	<!-- 리뷰 등록 -->
+	<insert id="insertReview" parameterType="reviewVO">
+		<selectKey resultType="String" order="BEFORE" keyProperty="reviewCd">
+			SELECT 	LPAD(NVL(MAX(REVIEW_CD) + 1, '001'), 3, '0')
+			FROM 	REVIEW
+		</selectKey>
+		INSERT INTO REVIEW(
+			REVIEW_CD,
+			REVIEW_CN,
+			RATING,
+			MBER_ID,
+			RSTRNT_CD,
+			VISIT_DATE,
+			REVIEW_DATE,
+			ATCH_FILE_CD)
+		VALUES(
+			#{reviewCd},
+			#{reviewCn},
+			#{rating},
+			#{mberId},
+			#{rstrntCd},
+			#{visitDate},
+			SYSDATE,
+			#{atchFileCd})
+	</insert>
+	
+	<!-- 첨부파일 목록 가져오기 -->
+	<select id="getAtchFileList" parameterType="atchFileVO" resultType="atchFileVO">
+		SELECT	ATCH_FILE_CD,
+				ATCH_FILE_SN,
+				ATCH_FILE_NM,
+				ATCH_FILE_TY,
+				ATCH_FILE_COURS,
+				MBER_ID
+		FROM	ATCH_FILE
+		WHERE	1=1
+		AND		MBER_ID = #{mberId}
+		AND		ATCH_FILE_CD = #{atchFileCd}
+	</select>
+	
+	<!-- 특정 첨부파일 삭제 -->
+	<delete id="deleteAtchFile" parameterType="java.util.List">
+	    DELETE
+	    FROM 	ATCH_FILE
+	    WHERE	1=1
+	    <foreach collection="list" item="atchFileVO" open="AND" separator="OR">
+		    (ATCH_FILE_CD = #{atchFileVO.atchFileCd} AND ATCH_FILE_SN = #{atchFileVO.atchFileSn})
+	    </foreach>
+	</delete>
+	
+	<!-- 리뷰 수정 -->
+	<update id="updateReview" parameterType="reviewVO">
+		UPDATE 	REVIEW
+		SET		REVIEW_CN = #{reviewCn},
+				VISIT_DATE = #{visitDate},
+				RATING = #{rating},
+				ATCH_FILE_CD = #{atchFileCd}
+		WHERE	REVIEW_CD = #{reviewCd}
+	</update>
+	
+	<!-- 순번 구하기 -->
+	<select id="getAtchFileSn" parameterType="String" resultType="int">
+		SELECT 	NVL(MAX(ATCH_FILE_SN), 1)
+		FROM 	ATCH_FILE
+		WHERE 	ATCH_FILE_CD = #{atchFileCd}
+	</select>
+	
+	<!-- 리뷰 삭제 -->
+	<delete id="deleteReview" parameterType="String">
+		DELETE
+		FROM	REVIEW
+		WHERE	REVIEW_CD = #{reviewCd}
+	</delete>
+	
+	<!-- 리뷰 삭제 -> 첨부파일 삭제 -->
+	<delete id="deleteAllAtchFile" parameterType="String">
+		DELETE
+		FROM	ATCH_FILE
+		WHERE	ATCH_FILE_CD = #{atchFileCd}
+	</delete>
+	
+	<!-- 첨부파일 개수 구하기 -->
+	<select id="atchFileCount" parameterType="String" resultType="int">
+		SELECT 	COUNT(*)
+		FROM 	ATCH_FILE
+		WHERE   ATCH_FILE_CD = #{atchFileCd}
+	</select>
+</mapper>
